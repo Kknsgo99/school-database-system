@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ระบบข้อมูลศิษย์เก่าและคลังเอกสารของโรงเรียน</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --primary: #1a56a0;
+      --primary-dark: #0f3d7a;
+      --primary-light: #e8f0fb;
+      --accent: #f59e0b;
+      --success: #10b981;
+      --danger: #ef4444;
+      --gray-50: #f9fafb;
+      --gray-100: #f3f4f6;
+      --gray-200: #e5e7eb;
+      --gray-700: #374151;
+      --text: #1f2937;
+      --sidebar-w: 260px;
+    }
+    * { box-sizing: border-box; }
+    body { font-family: 'Sarabun', sans-serif; font-size: 15px; color: var(--text); background: var(--gray-100); }
+
+    /* NAVBAR */
+    .top-navbar {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 1050;
+      height: 60px; background: var(--primary);
+      display: flex; align-items: center; padding: 0 1rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,.25);
+    }
+    .top-navbar .brand { color: #fff; font-size: 1.1rem; font-weight: 700; margin-left: .5rem; }
+    .top-navbar .ms-auto { display: flex; align-items: center; gap: .75rem; }
+    .top-navbar .user-badge {
+      background: rgba(255,255,255,.15); color: #fff;
+      border-radius: 20px; padding: .25rem .85rem; font-size: .85rem;
+    }
+    .btn-logout { background: rgba(255,255,255,.15); color: #fff; border: none; border-radius: 6px; padding: .35rem .9rem; cursor: pointer; font-family: inherit; }
+    .btn-logout:hover { background: rgba(255,255,255,.3); }
+
+    /* SIDEBAR */
+    #sidebar {
+      position: fixed; top: 60px; left: 0; bottom: 0;
+      width: var(--sidebar-w); background: var(--primary-dark);
+      overflow-y: auto; z-index: 1040;
+      transition: transform .3s;
+    }
+    #sidebar .nav-section { padding: .6rem 1rem .2rem; font-size: .72rem; color: rgba(255,255,255,.45); text-transform: uppercase; letter-spacing: .08em; }
+    #sidebar .nav-link {
+      display: flex; align-items: center; gap: .65rem;
+      padding: .55rem 1.2rem; color: rgba(255,255,255,.8);
+      text-decoration: none; font-size: .9rem; border-radius: 0;
+      transition: background .15s, color .15s;
+      cursor: pointer;
+    }
+    #sidebar .nav-link:hover, #sidebar .nav-link.active {
+      background: rgba(255,255,255,.12); color: #fff;
+      border-left: 3px solid var(--accent);
+    }
+    #sidebar .nav-link i { width: 20px; text-align: center; font-size: 1rem; }
+
+    /* MAIN */
+    #main-content { margin-left: var(--sidebar-w); padding-top: 60px; min-height: 100vh; }
+    .content-area { padding: 1.5rem; }
+
+    /* CARDS */
+    .card { border: none; border-radius: 10px; box-shadow: 0 1px 6px rgba(0,0,0,.07); }
+    .card-header { background: #fff; border-bottom: 1px solid var(--gray-200); font-weight: 600; padding: .9rem 1.2rem; }
+    .table th { background: var(--gray-50); font-weight: 600; font-size: .85rem; color: var(--gray-700); }
+    .table td { vertical-align: middle; font-size: .88rem; }
+
+    /* STATS */
+    .stat-card { border-radius: 10px; padding: 1.2rem 1.5rem; display: flex; align-items: center; gap: 1rem; }
+    .stat-card .icon { width: 52px; height: 52px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: #fff; }
+    .stat-card .val { font-size: 1.8rem; font-weight: 700; line-height: 1; }
+    .stat-card .lbl { font-size: .8rem; color: #777; }
+
+    /* PROFILE AVATAR */
+    .avatar-circle { width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 3px solid var(--primary); }
+    .avatar-placeholder { width: 80px; height: 80px; border-radius: 50%; background: var(--primary-light); display: flex; align-items: center; justify-content: center; font-size: 2rem; color: var(--primary); border: 3px solid var(--primary); }
+
+    /* PAGINATION / STEPS WIZARD */
+    .step-form { display: none; }
+    .step-form.active { display: block; }
+    .step-indicator { font-size: 0.82rem; color: #6c757d; }
+
+    /* FOOTER */
+    .site-footer {
+      background: var(--primary-dark); color: rgba(255,255,255,.75);
+      text-align: center; padding: 1.2rem; font-size: .85rem;
+      margin-left: 0;
+    }
+
+    /* MOBILE VIEW */
+    @media (max-width: 767px) {
+      #sidebar { transform: translateX(-100%); }
+      #sidebar.open { transform: translateX(0); }
+      #main-content { margin-left: 0; }
+    }
+    .sidebar-toggle { display: none; }
+    @media (max-width: 767px) { .sidebar-toggle { display: inline-flex; } }
+
+    .page-section { display: none; }
+    .page-section.active { display: block; }
+
+    .form-label { font-weight: 500; font-size: .88rem; }
+    .required::after { content: ' *'; color: var(--danger); }
+  </style>
+</head>
+<body>
+
+<!-- TOP NAVBAR -->
+<nav class="top-navbar">
+  <button class="btn sidebar-toggle text-white me-1 p-1" onclick="toggleSidebar()"><i class="bi bi-list fs-4"></i></button>
+  <span class="brand" id="nav-sitename">ระบบข้อมูลศิษย์เก่าโรงเรียน</span>
+  <div class="ms-auto">
+    <span class="user-badge" id="nav-user" style="display:none"></span>
+    <button class="btn-logout" id="nav-logout" onclick="doLogout()" style="display:none"><i class="bi bi-box-arrow-right"></i> ออกจากระบบ</button>
+  </div>
+</nav>
+
+<!-- SIDEBAR MENU -->
+<div id="sidebar">
+  <div id="menu-public">
+    <div class="nav-section">เมนูสาธารณะ</div>
+    <a class="nav-link active" onclick="showPage('public-home')"><i class="bi bi-house"></i> หน้าแรก</a>
+    <a class="nav-link" onclick="showPage('public-search')"><i class="bi bi-people-fill"></i> ค้นหาศิษย์เก่ารายรุ่น</a>
+    <a class="nav-link" onclick="showPage('deeka-search')"><i class="bi bi-file-earmark-spreadsheet"></i> ค้นหาฎีกาเก่า</a>
+    <hr class="my-2 border-secondary">
+    <a class="nav-link" onclick="showPage('login')"><i class="bi bi-box-arrow-in-right"></i> เข้าสู่ระบบ</a>
+    <a class="nav-link" onclick="showPage('register')"><i class="bi bi-person-plus"></i> ลงทะเบียนศิษย์เก่า</a>
+  </div>
+
+  <div id="menu-admin" style="display:none">
+    <div class="nav-section">แผงดูแลระบบ</div>
+    <a class="nav-link" onclick="showPage('admin-dashboard')"><i class="bi bi-speedometer2"></i> แดชบอร์ด</a>
+    <a class="nav-link" onclick="showPage('admin-admins')"><i class="bi bi-shield-check"></i> จัดการผู้ดูแลระบบ</a>
+    <a class="nav-link" onclick="showPage('admin-staff')"><i class="bi bi-person-badge"></i> จัดการเจ้าหน้าที่</a>
+    <a class="nav-link" onclick="showPage('admin-branches')"><i class="bi bi-diagram-3"></i> แผนกสาขาวิชา</a>
+    <a class="nav-link" onclick="showPage('admin-alumni')"><i class="bi bi-people"></i> ทะเบียนศิษย์เก่าทั้งหมด</a>
+  </div>
+</div>
+
+<!-- MAIN CONTENT -->
+<div id="main-content">
+<div class="content-area">
+
+  <!-- ===== PAGE: PUBLIC HOME ===== -->
+  <div class="page-section active" id="page-public-home">
+    <div class="p-5 mb-4 bg-primary text-white rounded-3 shadow-sm">
+      <div class="container-fluid py-5 text-center">
+        <h1 class="display-6 fw-bold">ยินดีต้อนรับสู่ระบบสืบค้นข้อมูลสารสนเทศ</h1>
+        <p class="fs-5">ระบบสืบค้นบัญชีรายชื่อศิษย์เก่าแต่ละรุ่น และคลังสืบค้นข้อมูลฎีกาเงินเก่าของสถานศึกษา</p>
+        <button class="btn btn-warning btn-lg text-white" onclick="showPage('register')"><i class="bi bi-person-plus-fill"></i> ลงทะเบียนศิษย์เก่าที่นี่</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== PAGE: PUBLIC SEARCH ALUMNI ===== -->
+  <div class="page-section" id="page-public-search">
+    <div class="card shadow-sm">
+      <div class="card-header bg-white text-dark py-3">
+        <h6 class="fw-bold mb-0"><i class="bi bi-people-fill text-primary"></i> บัญชีรายชื่อและระบบสืบค้นศิษย์เก่าแต่ละรุ่น</h6>
+      </div>
+      <div class="card-body">
+        <div class="row g-2 mb-3">
+          <div class="col-md-3">
+            <input type="number" id="filter-alumni-gen" class="form-control" placeholder="ระบุเลขรุ่นศิษย์เก่า (เช่น 25)">
+          </div>
+          <div class="col-md-6">
+            <div class="input-group">
+              <input type="text" id="filter-alumni-q" class="form-control" placeholder="พิมพ์คำค้นหา ชื่อ, นามสกุล หรือสาขาวิชา...">
+              <button class="btn btn-primary" onclick="executeAlumniSearch()"><i class="bi bi-search"></i> ค้นหาข้อมูล</button>
+            </div>
+          </div>
+        </div>
+        
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0" id="alumni-custom-table">
+            <thead class="table-light">
+              <tr>
+                <th class="text-center">รุ่น</th>
+                <th class="text-center">ปีที่จบ</th>
+                <th>ชื่อ-นามสกุล</th>
+                <th>สาขาวิชา</th>
+                <th>ช่องทางติดต่อ/เบอร์โทร</th>
+                <th>สถานที่ทำงาน/ตำแหน่ง</th>
+              </tr>
+            </thead>
+            <tbody id="alumni-custom-tbody">
+              <tr><td colspan="6" class="text-center text-muted py-3">ระบุข้อมูลที่ท่านต้องการด้านบนแล้วกดค้นหา</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== PAGE: DEEKA SEARCH ===== -->
+  <div class="page-section" id="page-deeka-search">
+    <div class="card shadow-sm">
+      <div class="card-header bg-white text-dark py-3">
+        <h6 class="fw-bold mb-0"><i class="bi bi-file-earmark-pdf text-danger"></i> ระบบบริการสืบค้นข้อมูลคลังใบฎีกาเงินเก่า</h6>
+      </div>
+      <div class="card-body">
+        <div class="row g-2 mb-3">
+          <div class="col-md-3">
+            <input type="number" id="deeka-year-q" class="form-control" placeholder="ระบุปีงบประมาณ พ.ศ. (เช่น 2568)">
+          </div>
+          <div class="col-md-6">
+            <div class="input-group">
+              <input type="text" id="deeka-text-q" class="form-control" placeholder="เลขที่ฎีกา, รายการรายละเอียด หรือผู้รับเงิน...">
+              <button class="btn btn-danger" onclick="executeDeekaSearch()"><i class="bi bi-search"></i> ค้นหาข้อมูลฎีกา</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="table table-bordered table-hover align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>เลขที่ฎีกา</th>
+                <th>ปีงบประมาณ</th>
+                <th>หมวดรายจ่าย</th>
+                <th>รายการรายละเอียด</th>
+                <th>จำนวนเงิน (บาท)</th>
+                <th>ผู้รับเงิน/หน่วยงาน</th>
+                <th>วันที่ลงนาม</th>
+                <th class="text-center">หลักฐานเอกสาร</th>
+              </tr>
+            </thead>
+            <tbody id="deeka-table-tbody">
+              <tr><td colspan="8" class="text-center text-muted py-3">ระบุเงื่อนไขค้นหาด้านบน เพื่อสืบค้นข้อมูลฎีกาเก่า</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== PAGE: LOGIN ===== -->
+  <div class="page-section" id="page-login">
+    <div class="row justify-content-center">
+      <div class="col-md-4">
+        <div class="card shadow">
+          <div class="card-header text-center bg-primary text-white py-3"><i class="bi bi-box-arrow-in-right"></i> ลงชื่อเข้าใช้งาน</div>
+          <div class="card-body p-4">
+            <div class="mb-3">
+              <label class="form-label">ชื่อผู้ใช้งาน (Username)</label>
+              <input type="text" id="login-user" class="form-control" placeholder="พิมพ์ชื่อผู้ใช้">
+            </div>
+            <div class="mb-4">
+              <label class="form-label">รหัสผ่าน (Password)</label>
+              <input type="password" id="login-pass" class="form-control" placeholder="พิมพ์รหัสผ่าน" onkeydown="if(event.key==='Enter')doLogin()">
+            </div>
+            <button class="btn btn-primary w-100 py-2" onclick="doLogin()"><i class="bi bi-box-arrow-in-right"></i> เข้าสู่ระบบ</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== PAGE: REGISTER (STEP-BY-STEP FLOW พร้อมระบบ OTP) ===== -->
+  <div class="page-section" id="page-register">
+    <div class="row justify-content-center">
+      <div class="col-md-6">
+        <div class="card shadow">
+          <div class="card-header bg-success text-white py-3">
+            <h5 class="mb-0"><i class="bi bi-person-plus-fill"></i> ลงทะเบียนระบบศิษย์เก่าและยืนยันตน</h5>
+          </div>
+          <div class="card-body p-4">
+
+            <!-- STEP 1: ประวัติส่วนตัวเบื้องต้น -->
+            <div id="step1" class="step-form active">
+              <div class="d-flex justify-content-between mb-3 border-bottom pb-2">
+                <span class="fw-bold text-primary">ขั้นตอนที่ 1: ข้อมูลส่วนตัวพื้นฐาน</span>
+                <span class="step-indicator">1 จาก 3</span>
+              </div>
+              
+              <div class="mb-3">
+                <label class="form-label required">รุ่นศิษย์เก่า (รุ่นที่)</label>
+                <select id="reg_generation" class="form-select">
+                  <option value="">-- เลือกรุ่นร่วมรุ่น --</option>
+                  <script>
+                    for(let i = 1; i <= 100; i++) {
+                      document.write(`<option value="${i}">ศิษย์เก่ารุ่นที่ ${i}</option>`);
+                    }
+                  </script>
+                </select>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label required">ปี พ.ศ. เกิด</label>
+                <select id="reg_birthdate" class="form-select">
+                  <option value="">-- เลือก พ.ศ. เกิด --</option>
+                  <script>
+                    const defaultYear = new Date().getFullYear() + 543;
+                    for(let y = defaultYear - 15; y >= defaultYear - 80; y--) {
+                      document.write(`<option value="${y}">ปี พ.ศ. ${y}</option>`);
+                    }
+                  </script>
+                </select>
+              </div>
+
+              <div class="row g-2 mb-3">
+                <div class="col-md-4">
+                  <label class="form-label required">คำนำหน้าชื่อ</label>
+                  <select id="reg_prefix" class="form-select">
+                    <option value="นาย">นาย</option>
+                    <option value="นาง">นาง</option>
+                    <option value="นางสาว">นางสาว</option>
+                  </select>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label required">ชื่อจริง</label>
+                  <input type="text" id="reg_firstName" class="form-control" placeholder="ชื่อจริง">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label required">นามสกุลจริง</label>
+                  <input type="text" id="reg_lastName" class="form-control" placeholder="นามสกุล">
+                </div>
+              </div>
+
+              <div class="mb-4">
+                <label class="form-label required">เบอร์โทรศัพท์มือถือ</label>
+                <input type="tel" id="reg_mobile" class="form-control" value="+66" placeholder="+668xxxxxxxx">
+                <small class="text-muted d-block mt-1">กรอกในรูปแบบสากล: +66 ติดตามด้วยเบอร์โทร เช่น +66812345678</small>
+              </div>
+
+              <button type="button" class="btn btn-primary w-100 py-2" onclick="handleSendOTP()">บันทึกข้อมูลและส่งรหัส OTP</button>
+            </div>
+
+            <!-- STEP 2: การตรวจสอบ OTP -->
+            <div id="step2" class="step-form">
+              <div class="d-flex justify-content-between mb-3 border-bottom pb-2">
+                <span class="fw-bold text-warning">ขั้นตอนที่ 2: ยืนยันความปลอดภัย OTP</span>
+                <span class="step-indicator">2 จาก 3</span>
+              </div>
+              <p class="text-muted small">ระบบจำลองการส่งรหัส OTP เลข 4 หลักไปยังเบอร์มือถือ <span id="display_phone" class="fw-bold text-dark"></span></p>
+              
+              <div class="mb-4 text-center">
+                <label class="form-label d-block text-start required">รหัส OTP 4 หลัก</label>
+                <input type="text" id="reg_otp" class="form-control text-center fs-2 fw-bold" maxlength="4" placeholder="0000" style="letter-spacing: 12px;">
+              </div>
+
+              <button type="button" class="btn btn-warning text-white w-100 py-2 mb-2" onclick="handleVerifyOTP()">ยืนยันความถูกต้อง OTP</button>
+              <button type="button" class="btn btn-light w-100 btn-sm" onclick="changeStep(1)">แก้ไขเบอร์มือถือ/ข้อมูลส่วนตัว</button>
+            </div>
+
+            <!-- STEP 3: กำหนดรหัสและบัญชีใช้งาน -->
+            <div id="step3" class="step-form">
+              <div class="d-flex justify-content-between mb-3 border-bottom pb-2">
+                <span class="fw-bold text-success">ขั้นตอนที่ 3: กำหนดสิทธิ์บัญชีใช้งาน</span>
+                <span class="step-indicator">3 จาก 3</span>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label required">ชื่อผู้ใช้งาน (Username)</label>
+                <input type="text" id="reg_username" class="form-control" placeholder="ระบุอักษรภาษาอังกฤษหรือตัวเลข">
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label required">รหัสผ่าน (Password)</label>
+                <input type="password" id="reg_password" class="form-control" placeholder="กำหนดรหัสผ่าน">
+              </div>
+
+              <div class="mb-4">
+                <label class="form-label required">ยืนยันรหัสผ่านอีกครั้ง (Confirm Password)</label>
+                <input type="password" id="reg_confirm_password" class="form-control" placeholder="กรอกรหัสผ่านให้ตรงกันอีกครั้ง">
+              </div>
+
+              <button type="button" class="btn btn-success w-100 py-2" onclick="handleFinalRegister()">บันทึกบัญชีผู้ใช้</button>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<!-- FOOTER -->
+<footer class="site-footer" id="site-footer">
+  Copyright © 2026 ระบบฐานข้อมูลสารสนเทศและศิษย์เก่า | โดย KKnasawan
+</footer>
+
+<?!= include('script') ?>
+</body>
+</html>

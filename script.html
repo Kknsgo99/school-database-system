@@ -1,0 +1,329 @@
+<script>
+  // ฟังก์ชันสลับการแสดงผลหน้าเพจต่าง ๆ
+  function showPage(pageId) {
+    document.querySelectorAll('.page-section').forEach(section => {
+      section.classList.remove('active');
+    });
+    const target = document.getElementById('page-' + pageId);
+    if (target) {
+      target.classList.add('active');
+    }
+    
+    // ไฮไลต์ปุ่มเมนูบนแถบเมนูด้านข้าง
+    document.querySelectorAll('#sidebar .nav-link').forEach(link => {
+      link.classList.remove('active');
+    });
+    
+    // ตรวจสอบและปิดเมนูข้างอัตโนมัติบนหน้าจอมือถือ
+    const sidebar = document.getElementById('sidebar');
+    if (sidebar) sidebar.classList.remove('open');
+  }
+
+  function toggleSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    if (sidebar) sidebar.classList.toggle('open');
+  }
+
+  // ============================================================
+  // ขั้นตอนลงทะเบียนศิษย์เก่าร่วมรุ่นด้วยระบบ OTP 4 หลัก
+  // ============================================================
+  
+  function changeStep(stepNum) {
+    document.querySelectorAll('.step-form').forEach(form => form.classList.remove('active'));
+    document.getElementById('step' + stepNum).classList.add('active');
+  }
+
+  // บันทึกข้อมูลประวัติส่งรหัส OTP (Step 1)
+  function handleSendOTP() {
+    const generation = document.getElementById('reg_generation').value;
+    const birthdate = document.getElementById('reg_birthdate').value;
+    const prefix = document.getElementById('reg_prefix').value;
+    const firstName = document.getElementById('reg_firstName').value.trim();
+    const lastName = document.getElementById('reg_lastName').value.trim();
+    const mobile = document.getElementById('reg_mobile').value.trim();
+
+    if (!generation || !birthdate || !firstName || !lastName) {
+      Swal.fire('ข้อความเตือน', 'กรุณาระบุข้อมูลส่วนบุคคลของท่านให้ครบถ้วนก่อนส่ง OTP', 'warning');
+      return;
+    }
+
+    if (mobile.length < 10 || !mobile.startsWith('+66')) {
+      Swal.fire('รูปแบบเบอร์มือถือผิด', 'กรุณากรอกเบอร์มือถือในรูปแบบสากล เช่น +66812345678', 'warning');
+      return;
+    }
+
+    Swal.fire({
+      title: 'กำลังเชื่อมต่อระบบเพื่อส่ง OTP...',
+      allowOutsideClick: false,
+      didOpen: () => { Swal.showLoading(); }
+    });
+
+    google.script.run
+      .withSuccessHandler(function(res) {
+        Swal.close();
+        if (res.success) {
+          document.getElementById('display_phone').innerText = mobile;
+          
+          // ข้อความจำลองเพื่อให้นักพัฒนาใช้ทดสอบรหัสผ่านรวดเร็ว
+          let showText = res.message;
+          if (res.debugOtp) {
+            showText += `<br><br><span class="text-danger fs-5"><b>รหัส OTP ของท่านคือ: ${res.debugOtp}</b></span>`;
+          }
+
+          Swal.fire({
+            title: 'ส่งรหัสยืนยันสำเร็จ',
+            html: showText,
+            icon: 'success'
+          }).then(() => {
+            changeStep(2); // เดินหน้าไปหน้ากรอกยืนยัน OTP
+          });
+        } else {
+          Swal.fire('เกิดข้อผิดพลาด', res.message, 'error');
+        }
+      })
+      .sendOTPToPhone({ mobile: mobile });
+  }
+
+  // ยืนยันความถูกต้องของ OTP (Step 2)
+  function handleVerifyOTP() {
+    const mobile = document.getElementById('reg_mobile').value.trim();
+    const otp = document.getElementById('reg_otp').value.trim();
+
+    if (otp.length !== 4) {
+      Swal.fire('คำเตือน', 'กรุณากรอกรหัส OTP ความยาว 4 หลักให้ครบถ้วน', 'warning');
+      return;
+    }
+
+    Swal.fire({
+      title: 'กำลังตรวจสอบรหัสความปลอดภัย...',
+      allowOutsideClick: false,
+      didOpen: () => { Swal.showLoading(); }
+    });
+
+    google.script.run
+      .withSuccessHandler(function(res) {
+        Swal.close();
+        if (res.success) {
+          Swal.fire('ยืนยันตัวตนสำเร็จ', res.message, 'success').then(() => {
+            changeStep(3); // ย้ายไปหน้าตั้งค่า Username / Password ทันที
+          });
+        } else {
+          Swal.fire('ข้อมูลไม่ถูกต้อง', res.message, 'error');
+        }
+      })
+      .verifyOTPCode({ mobile: mobile, otp: otp });
+  }
+
+  // ลงทะเบียนและกรอกสิทธิ์ผู้ใช้รอบสุดท้าย (Step 3)
+  function handleFinalRegister() {
+    const username = document.getElementById('reg_username').value.trim();
+    const password = document.getElementById('reg_password').value;
+    const confirmPass = document.getElementById('reg_confirm_password').value;
+
+    if (!username || !password) {
+      Swal.fire('ข้อควรระวัง', 'กรุณากำหนดชื่อผู้ใช้และรหัสผ่านเพื่อใช้เข้าสู่ระบบ', 'warning');
+      return;
+    }
+    if (password !== confirmPass) {
+      Swal.fire('รหัสผ่านไม่ตรงกัน', 'รหัสผ่านและช่องยืนยันรหัสผ่านไม่ตรงกัน กรุณาตรวจสอบอีกครั้ง', 'error');
+      return;
+    }
+
+    Swal.fire({
+      title: 'ระบบกำลังบันทึกบัญชีของท่าน...',
+      allowOutsideClick: false,
+      didOpen: () => { Swal.showLoading(); }
+    });
+
+    const regParams = {
+      generation: document.getElementById('reg_generation').value,
+      birthdate: document.getElementById('reg_birthdate').value,
+      firstName: document.getElementById('reg_prefix').value + document.getElementById('reg_firstName').value.trim(),
+      lastName: document.getElementById('reg_lastName').value.trim(),
+      mobile: document.getElementById('reg_mobile').value.trim(),
+      username: username,
+      password: password
+    };
+
+    google.script.run
+      .withSuccessHandler(function(res) {
+        Swal.close();
+        if (res.success) {
+          Swal.fire({
+            title: 'ลงทะเบียนสำเร็จเรียบร้อย!',
+            html: `บัญชีใช้งานของท่านพร้อมทำงานแล้ว:<br><b>Username:</b> ${res.data.username}<br><b>Password:</b> ${res.data.password}`,
+            icon: 'success',
+            confirmButtonText: 'เข้าสู่ระบบทันที'
+          }).then((result) => {
+            if (result.isConfirmed) {
+              // ทำการกระโดดไปยังระเบียบการ Login อัตโนมัติทันที
+              autoLoginProcess(res.data.username, res.data.password);
+            }
+          });
+        } else {
+          Swal.fire('เกิดปัญหา', res.message, 'error');
+        }
+      })
+      .finalRegisterAlumni(regParams);
+  }
+
+  // ล็อกอินอัตโนมัติเมื่อกดตกลง
+  function autoLoginProcess(user, pass) {
+    Swal.fire({
+      title: 'กำลังพาท่านเข้าสู่ระบบ...',
+      allowOutsideClick: false,
+      didOpen: () => { Swal.showLoading(); }
+    });
+
+    google.script.run
+      .withSuccessHandler(function(res) {
+        Swal.close();
+        if (res.success) {
+          Swal.fire('ยินดีต้อนรับ', 'เข้าสู่แอปพลิเคชันหลักสำเร็จแล้ว', 'success').then(() => {
+            // โหลดระบบใหม่หรือนำทางไปยังแดชบอร์ดตามโครงสร้างเซสชัน
+            location.reload();
+          });
+        } else {
+          Swal.fire('ไม่สามารถยืนยันตัวตนได้', res.message, 'error');
+        }
+      })
+      .login({ username: user, password: pass });
+  }
+
+  // ============================================================
+  // ระบบค้นหาศิษย์เก่าสาธารณะ
+  // ============================================================
+  function executeAlumniSearch() {
+    const gen = document.getElementById('filter-alumni-gen').value.trim();
+    const q = document.getElementById('filter-alumni-q').value.trim().toLowerCase();
+    const tbody = document.getElementById('alumni-custom-tbody');
+
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center"><div class="spinner-border spinner-border-sm text-primary"></div> กำลังเรียกรายชื่อจากฐานข้อมูล...</td></tr>';
+
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (res.success) {
+          const filtered = res.data.filter(item => {
+            const matchGen = gen ? String(item.generation) === String(gen) : true;
+            const fullName = (item.firstName + ' ' + item.lastName).toLowerCase();
+            const matchText = q ? (
+              fullName.includes(q) ||
+              String(item.branch).toLowerCase().includes(q)
+            ) : true;
+            return matchGen && matchText;
+          });
+
+          if (filtered.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">❌ ไม่พบรายชื่อศิษย์เก่าในเงื่อนไขการค้นหานี้</td></tr>';
+            return;
+          }
+
+          let html = '';
+          filtered.forEach(al => {
+            const imgEl = al.photoUrl 
+              ? `<img src="${al.photoUrl}" class="rounded-circle" style="width: 38px; height: 38px; object-fit: cover;">`
+              : `<div class="bg-primary-light text-primary rounded-circle d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;"><i class="bi bi-person"></i></div>`;
+
+            html += `<tr>
+              <td class="text-center"><span class="badge bg-primary px-3 rounded-pill">รุ่นที่ ${al.generation || '-'}</span></td>
+              <td class="text-center">${al.graduateYear || '-'}</td>
+              <td>
+                <div class="d-flex align-items-center gap-2">
+                  ${imgEl}
+                  <strong>${al.firstName} ${al.lastName}</strong> ${al.nickname ? `(${al.nickname})` : ''}
+                </div>
+              </td>
+              <td>${al.branch || '-'}</td>
+              <td>
+                <div class="small">
+                  <i class="bi bi-telephone-fill text-success"></i> ${al.mobile || al.phone || '-'} <br>
+                  <i class="bi bi-envelope text-muted"></i> ${al.email || '-'}
+                </div>
+              </td>
+              <td>
+                <div class="small">
+                  <strong>${al.position || '-'}</strong> <br>
+                  <span class="text-muted">${al.company || '-'}</span>
+                </div>
+              </td>
+            </tr>`;
+          });
+          tbody.innerHTML = html;
+        }
+      })
+      .getAlumni({ status: 'approved' });
+  }
+
+  // ============================================================
+  // ระบบค้นหาข้อมูลฎีกาเก่า
+  // ============================================================
+  function executeDeekaSearch() {
+    const year = document.getElementById('deeka-year-q').value.trim();
+    const q = document.getElementById('deeka-text-q').value.trim();
+    const tbody = document.getElementById('deeka-table-tbody');
+
+    tbody.innerHTML = '<tr><td colspan="8" class="text-center"><div class="spinner-border spinner-border-sm text-danger"></div> กำลังดึงประวัติไฟล์ฎีกา...</td></tr>';
+
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (res.success) {
+          if (res.data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">❌ ไม่พบประวัติฎีกาตรงตามที่ค้นหา</td></tr>';
+            return;
+          }
+
+          let html = '';
+          res.data.forEach(doc => {
+            const linkBtn = doc.fileUrl 
+              ? `<a href="${doc.fileUrl}" target="_blank" class="btn btn-sm btn-outline-danger py-1 px-3 rounded"><i class="bi bi-file-pdf"></i> เปิดเอกสาร</a>`
+              : '<span class="text-muted small">ไม่มีหลักฐานแนบ</span>';
+
+            html += `<tr>
+              <td class="fw-bold text-dark">${doc.deekaId}</td>
+              <td class="text-center">${doc.year}</td>
+              <td><span class="badge bg-light text-dark border">${doc.category}</span></td>
+              <td>${doc.detail}</td>
+              <td class="text-end fw-bold text-primary">${Number(doc.amount).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+              <td>${doc.payee}</td>
+              <td>${doc.date || '-'}</td>
+              <td class="text-center">${linkBtn}</td>
+            </tr>`;
+          });
+          tbody.innerHTML = html;
+        } else {
+          tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger">เกิดข้อผิดพลาด: ${res.message}</td></tr>`;
+        }
+      })
+      .searchDeekaDocuments({ q: q, year: year });
+  }
+
+  // ฟังก์ชันลงทะเบียน Login หลักปกติทั่วไป
+  function doLogin() {
+    const user = document.getElementById('login-user').value.trim();
+    const pass = document.getElementById('login-pass').value;
+
+    if (!user || !pass) {
+      Swal.fire('แจ้งเตือน', 'กรุณาระบุ Username และ Password ให้ครบถ้วน', 'warning');
+      return;
+    }
+
+    Swal.fire({
+      title: 'กำลังล็อกอินเข้าสู่ระบบ...',
+      allowOutsideClick: false,
+      didOpen: () => { Swal.showLoading(); }
+    });
+
+    google.script.run
+      .withSuccessHandler(function(res) {
+        Swal.close();
+        if (res.success) {
+          Swal.fire('ยินดีต้อนรับ', 'ลงชื่อเข้าใช้งานสำเร็จ', 'success').then(() => {
+            location.reload();
+          });
+        } else {
+          Swal.fire('ไม่สามารถล็อกอินได้', res.message, 'error');
+        }
+      })
+      .login({ username: user, password: pass });
+  }
+</script>
